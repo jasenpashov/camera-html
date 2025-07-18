@@ -2,15 +2,15 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = 'uploads/';
-        $filename = basename($_FILES['file']['name']);
-        $targetPath = $uploadDir . time() . '_' . $filename;
 
-        // Създаване на папката ако не съществува
+        // Гарантиране, че файлът ще е с разширение .jpg
+        $filename = pathinfo($_FILES['file']['name'], PATHINFO_FILENAME);
+        $targetPath = $uploadDir . time() . '_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $filename) . '.jpg';
+
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
 
-        // Запазване на файла
         if (move_uploaded_file($_FILES['file']['tmp_name'], $targetPath)) {
             echo '<h2>Снимката е качена успешно:</h2>';
             echo '<img src="' . $targetPath . '" alt="Качена снимка" style="max-width: 100%;">';

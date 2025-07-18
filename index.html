@@ -462,7 +462,7 @@ video, canvas {
 
         canvas.toBlob(function (blob) {
           const formData = new FormData();
-          formData.append('image', blob, 'photo.png');
+          formData.append('file', blob, 'photo.jpg');
 
           $.ajax({
             url: URL_UPLOAD,
