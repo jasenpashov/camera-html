@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <title>Камери и резолюции</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    select, button { margin: 10px 0; }
+    video { display: block; max-width: 100%; margin-top: 20px; }
+    pre { background: #f0f0f0; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Тест на камери и резолюции</h1>
+
+  <label for="cameraSelect">Избери камера:</label>
+  <select id="cameraSelect"></select>
+  <br>
+
+  <button onclick="testResolutions()">Тествай резолюции</button>
+  <br>
+
+  <video id="video" autoplay playsinline></video>
+
+  <h2>Резултати:</h2>
+  <pre id="results">Избери камера и натисни бутона...</pre>
+
+  <script>
+    const video = document.getElementById('video');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const results = document.getElementById('results');
+
+    let devices = [];
+
+    async function getCameras() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      devices = allDevices.filter(d => d.kind === 'videoinput');
+
+      cameraSelect.innerHTML = '';
+      devices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Камера ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    async function testResolutions() {
+      results.textContent = 'Тестване...\n';
+      const selectedId = cameraSelect.value;
+      const resolutions = [
+        { width: 1920, height: 1080 },
+        { width: 1280, height: 720 },
+        { width: 640, height: 480 },
+        { width: 320, height: 240 }
+      ];
+
+      for (let res of resolutions) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: selectedId },
+              width: res.width,
+              height: res.height
+            }
+          });
+
+          video.srcObject = stream;
+          const track = stream.getVideoTracks()[0];
+          const settings = track.getSettings();
+
+          results.textContent += `✅ ${res.width}x${res.height} -> реално: ${settings.width}x${settings.height}\n`;
+
+          // Спираме камерата преди следващ тест
+          stream.getTracks().forEach(t => t.stop());
+        } catch (err) {
+          results.textContent += `❌ ${res.width}x${res.height} не се поддържа\n`;
+        }
+      }
+    }
+
+    // Зареждане на камерите при зареждане на страницата
+    getCameras().catch(err => {
+      alert("Грешка при достъп до камерата: " + err.message);
+    });
+  </script>
+</body>
+</html>

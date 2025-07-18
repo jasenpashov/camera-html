@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Камера заснемане</title>
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
+    <style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
+  border:none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#videoWrapper {
+  width: auto;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+video, canvas {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+}
+
+.messege{
+  width: auto;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.messege h3{
+  color: #c93e3e;
+}
+#ico-rotate-landscape{
+  font-size: 80px;
+  color: #c93e3e;
+}
+
+.controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: max(12px,env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  z-index: 999;
+}
+
+#flashToggleBtn {
+  position: fixed;
+  inset-block-start: max(12px, env(safe-area-inset-top));
+  inset-inline-start: max(12px, env(safe-area-inset-left));
+  z-index: 1000;
+  font-size: clamp(18px, 2.5vw, 26px);
+  padding: clamp(8px, 2vw, 14px);
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+
+#icon-fullscreen {
+  position: fixed;
+  inset-block-start: max(12px, env(safe-area-inset-top));
+  inset-inline-end: max(12px, env(safe-area-inset-right));
+  z-index: 1000;
+  font-size: clamp(18px, 2.5vw, 26px);
+  padding: clamp(8px, 2vw, 14px);
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+
+.btn-only-ico {
+  z-index: 1000;
+  font-size: 36px;
+  padding: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+
+#startBtn {
+  font-size: 20px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  background-color: #007bff;
+}  
+
+#loading {
+  position:absolute;
+  top:50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 10px;
+  display: none;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(3px);
+  border-radius: 8px;
+}
+#loading h3{
+  color: #fff;
+}
+@media (orientation: portrait) {
+  #videoWrapper {
+    display: none;
+  }
+  #warning{
+    display: flex;
+  }
+  #startBtn, .controls, #flashToggleBtn, #captureVideoBtn, #confirmBtn, #retryBtn{
+      display: none;
+  }
+}
+  </style>
+  </head>
+  <body>
+
+    <div id="videoWrapper">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+    <div id="warning" class="messege">
+      <span id="ico-rotate-landscape" class="mdi mdi-phone-rotate-landscape"></span>
+      <h3>
+        Моля, снимайте в пейзажен режим.
+      </h3>
+    </div>
+
+    <i id="flashToggleBtn" class="mdi mdi-flash-off" style="display:none;"></i>
+    <i id="icon-fullscreen" class="mdi mdi-fullscreen" style="display:none;" ></i>
+    
+    <div class="controls">
+      <button id="startBtn"><i class="mdi mdi-play"></i> Старт</button>
+      <button id="captureVideoBtn" class="btn-only-ico" style="display:none;"><span class="mdi mdi-camera-outline"></span></button>
+      <!-- <button id="captureCameraBtn" style="display:none;">От камера</button> -->
+      <button id="confirmBtn" class="btn-only-ico" style="display:none;"><i class="mdi mdi-check-bold"></i></button>
+      <button id="retryBtn" class="btn-only-ico" style="display:none;"><i class="mdi mdi-restart"></i></button>
+    </div>
+    <div id="loading">
+      <h3>Изпращане</h3>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+      // 3840 × 2160 (4K UHD, което е 8.29 MP) Aspect Ratio 16:9
+      // 3680 × 2070 (≈7.6 MP) Aspect Ratio 16:9
+      // 3264 x 2448 (7,99) - Aspect Ratio 4:3
+    const widescreenFormat = true;
+    const MAX_WIDTH = widescreenFormat ? 3840 : 3264;
+    const MAX_HEIGHT = widescreenFormat ? 2160: 2448 ;
+
+    const URL_UPLOAD = "upload.php";
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    var stream = null;
+    var videoTrack = null;
+    var torchOn = false;
+    var flagFullscreen = false;
+    var flagReadyPhoto = false;
+
+    function isMobileDevice() {
+      //return true;
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    function enterFullscreen() {
+      flagFullscreen=true;
+      $("#icon-fullscreen").removeClass('mdi-fullscreen');
+      $("#icon-fullscreen").addClass('mdi-fullscreen-exit');
+      $("#icon-fullscreen").show();
+      const elem = document.documentElement;
+
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) { // Safari
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) { // IE11
+        elem.msRequestFullscreen();
+      } else {
+        console.log("Fullscreen API не се поддържа от този браузър.");
+        $("#icon-fullscreen").hide();
+      }
+    }
+
+    function exitFullscreen() {
+      flagFullscreen = false;
+      $("#icon-fullscreen").removeClass('mdi-fullscreen-exit');
+      $("#icon-fullscreen").addClass('mdi-fullscreen');
+
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) { // Safari
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) { // IE11
+        document.msExitFullscreen();
+      } else {
+        console.log("Fullscreen API не се поддържа от този браузър.");
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement &&
+          !document.webkitFullscreenElement &&
+          !document.msFullscreenElement) {
+        enterFullscreen();
+      } else {
+        exitFullscreen();
+      }
+    }
+
+    function checkOrientation() {
+        if (window.matchMedia("(orientation: portrait)").matches) {
+            // Портретен режим
+        } else {
+            // Пейзажен режим
+            if(flagFullscreen){
+              video.style.display = 'none';
+              if(!flagReadyPhoto) {
+                startCamera();
+              }
+            }
+        }
+    }
+
+   function processPermissions() {
+     const permissions = [
+      "camera",
+      "geolocation"
+    ];
+    try {
+     for (const permission of permissions) {
+        navigator.permissions.query({ name: permission }).then(function (rz) {
+            if (rz.state !== 'granted') {
+              if (permission === 'camera') {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                  .then(stream => {
+                    console.log('Достъп до камерата получен');
+                    stream.getTracks().forEach(track => track.stop()); // cleanup
+                  })
+                  .catch(err => {
+                    console.warn('Потребителят отказа достъп до камерата:', err);
+                  });
+
+              } else if (permission === 'geolocation') {
+                navigator.geolocation.getCurrentPosition(
+                  pos => {
+                    console.log('Геолокация получена:', pos);
+                  },
+                  err => {
+                    console.warn('Грешка при достъп до геолокация:', err);
+                  }
+                );
+              }
+
+            } else {
+              console.log("OK =>", permission, rz);
+            }
+          });
+        }
+      } catch (e) {
+        console.log(e, 'not supported or error');
+      }
+    }
+
+    function drawImageFromCamera() {
+      let constraints = { video: { facingMode: "environment" } };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(function (mediaStream) {
+          videoTrack = mediaStream.getVideoTracks()[0];
+          let imageCapture = new ImageCapture(videoTrack);
+
+          imageCapture.takePhoto()
+            .then(function (blob) {
+              let image = new Image();
+              image.onload = function () {
+                const scaleW = MAX_WIDTH / image.width;
+                const scaleH = MAX_HEIGHT / image.height;
+                const scale = Math.min(1, scaleW, scaleH);
+                const newWidth = Math.round(image.width * scale);
+                const newHeight = Math.round(image.height * scale);
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0, newWidth, newHeight);
+                canvas.style.display = 'block';
+                video.style.display = 'none';
+                toggleButtonsAfterCapture();
+              };
+              image.src = URL.createObjectURL(blob);
+            })
+            .catch(error => {
+              alert("Грешка при заснемане: " + error.message);
+            });
+        })
+        .catch(error => {
+          alert("Грешка при достъп до камерата: " + error.message);
+        });
+    }
+
+    function drawImageFromVideo() {
+      const srcW = video.videoWidth;
+      const srcH = video.videoHeight;
+
+      const scaleW = MAX_WIDTH / srcW;
+      const scaleH = MAX_HEIGHT / srcH;
+      const scale = Math.min(scaleW, scaleH, 1);
+
+      const targetW = Math.floor(srcW * scale);
+      const targetH = Math.floor(srcH * scale);
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, srcW, srcH, 0, 0, targetW, targetH);
+      flagReadyPhoto=true;
+      canvas.style.display = 'block';
+      video.style.display = 'none';
+      toggleButtonsAfterCapture();
+    }
+
+    async function startCamera() {
+      try {
+          navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: 'environment',
+                width: { ideal: MAX_WIDTH },
+                height: { ideal: MAX_HEIGHT }
+              }
+            })
+            .then(function (stream) {
+              video.style.display = 'block';
+              $('#startBtn').hide();
+              $('#captureVideoBtn, #captureCameraBtn').show();
+              video.srcObject = stream;
+              videoTrack = stream.getVideoTracks()[0];
+              const capabilities = videoTrack.getCapabilities();
+              console.log('Capabilities:', capabilities);
+              if (capabilities.torch) {
+                console.log('Има налична светкавица!');
+                $('#flashToggleBtn').show();
+              } else {
+                console.log('Устройството няма светкавица.');
+                $('#flashToggleBtn').hide();
+              }
+        })
+        } catch (err) {
+          alert('Грешка при достъп до камерата: ' + err.message);
+        }
+    }
+
+    async function toggleTorch(on) {
+      if (!videoTrack) return;
+
+      const capabilities = videoTrack.getCapabilities();
+      if (!capabilities.torch) {
+        alert('Светкавицата не се поддържа на това устройство.');
+        return;
+      }
+
+      try {
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: on }]
+        });
+        console.log('Светкавицата е ' + (on ? 'включена' : 'изключена'));
+      } catch (e) {
+        console.error('Грешка при включване на светкавицата:', e);
+      }
+    }
+
+    function toggleButtonsAfterCapture() {
+      $('#captureVideoBtn, #captureCameraBtn').hide();
+      $('#confirmBtn, #retryBtn').show();
+    }
+
+    $(document).ready(function () {
+      
+      if (!isMobileDevice()) {
+        $('body').html('<h2 style="color:#fff">Услугата е достъпна само на мобилно устройство.</h2>');
+        return;
+      }
+      
+      processPermissions();
+      checkOrientation();
+
+      $('#flashToggleBtn').on('click', function () {
+        torchOn = !torchOn;
+        toggleTorch(torchOn);
+        if(torchOn){
+          $(this).removeClass('mdi-flash-off');
+          $(this).addClass('mdi-flash')
+        }else{
+          $(this).addClass('mdi-flash-off');
+          $(this).removeClass('mdi-flash')
+        }
+      });
+
+      $('#startBtn').on('click', async function () {
+        enterFullscreen();
+        startCamera();
+      });
+
+      $('#captureVideoBtn').on('click', function () {
+        drawImageFromVideo();
+      });
+
+      $('#captureCameraBtn').on('click', function () {
+        drawImageFromCamera();
+      });
+
+      $('#retryBtn').on('click', function () {
+        flagReadyPhoto = false;
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+        $('#confirmBtn, #retryBtn').hide();
+        $('#captureVideoBtn, #captureCameraBtn').show();
+      });
+
+      $('#confirmBtn').on('click', function () {
+        $('#loading h3').html('Изпращане');
+        $('#loading').show();
+
+        canvas.toBlob(function (blob) {
+          const formData = new FormData();
+          formData.append('image', blob, 'photo.png');
+
+          $.ajax({
+            url: URL_UPLOAD,
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function () {
+             $('#loading h3').html('Снимката е изпратена успешно!');
+              setTimeout(function() {
+                $('#loading').hide();
+                $('#retryBtn').click();
+              }, 1000);
+              flagReadyPhoto = false;
+            },
+            error: function (xhr, status, error) {
+              $('#loading').hide();
+              alert('Грешка при изпращане: ' + error);
+            }
+          });
+        }, 'image/png');
+      });
+    });
+
+    $('#icon-fullscreen').on('click', function () {
+      toggleFullscreen();
+    })
+    
+    $(window).on('resize orientationchange', function () {
+      checkOrientation();
+    });
+
+  </script>
+  </body>
+</html>
